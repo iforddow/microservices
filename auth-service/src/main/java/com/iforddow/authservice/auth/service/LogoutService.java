@@ -43,7 +43,6 @@ public class LogoutService {
     public void logout(LogoutRequest logoutRequest, HttpServletResponse response) {
 
         try {
-
             String refreshToken = logoutRequest.getRefreshToken();
 
             if (AuthServiceUtility.isNullOrEmpty(refreshToken)) {
@@ -53,13 +52,11 @@ public class LogoutService {
             String hashedRefreshToken = tokenHasher.hmacSha256(refreshToken);
 
             if (logoutRequest.isAllDevices()) {
-
                 UUID userId = redisRefreshTokenService.getUserIdFromToken(hashedRefreshToken);
 
                 if(userId == null) {
                     throw new BadRequestException("Invalid user refresh token");
                 }
-
                 redisRefreshTokenService.revokeAllTokensForUser(userId);
             } else {
                 redisRefreshTokenService.revokeToken(hashedRefreshToken);

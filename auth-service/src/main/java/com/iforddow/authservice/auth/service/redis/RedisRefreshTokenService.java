@@ -107,4 +107,26 @@ public class RedisRefreshTokenService {
         stringRedisTemplate.delete(userTokensKey);
     }
 
+    /*
+    * A method to remove all expired tokens in a users set.
+    *
+    * @author IFD
+    * @since 2025-08-15
+    * */
+    public void removeExpiredTokensForUser(UUID uuid) {
+        String userTokensKey = getUserTokensPrefix() + uuid.toString();
+
+        Set<String> userTokens = stringRedisTemplate.opsForSet().members(userTokensKey);
+
+        if (userTokens != null && !userTokens.isEmpty()) {
+            for (String token : userTokens) {
+                String tokenKey = getTokenPrefix() + token;
+                boolean exists = stringRedisTemplate.hasKey(tokenKey);
+                if (!exists) {
+                    stringRedisTemplate.opsForSet().remove(userTokensKey, token);
+                }
+            }
+        }
+    }
+
 }

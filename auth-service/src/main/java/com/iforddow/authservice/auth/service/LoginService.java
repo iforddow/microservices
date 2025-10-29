@@ -1,8 +1,12 @@
 package com.iforddow.authservice.auth.service;
 
+import com.iforddow.authservice.auth.dto.LoginDTO;
 import com.iforddow.authservice.auth.entity.User;
 import com.iforddow.authservice.auth.repository.UserRepository;
 import com.iforddow.authservice.auth.request.LoginRequest;
+import com.iforddow.authservice.auth.service.redis.RedisRefreshTokenService;
+import com.iforddow.authservice.auth.utility.DeviceType;
+import com.iforddow.authservice.auth.utility.TokenHasher;
 import com.iforddow.authservice.common.exception.BadRequestException;
 import com.iforddow.authservice.common.exception.InvalidCredentialsException;
 import com.iforddow.authservice.common.exception.ResourceNotFoundException;
@@ -17,9 +21,6 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
-import java.util.Optional;
-
 /**
  * A service class for user login methods.
  *
@@ -33,6 +34,8 @@ public class LoginService {
     private final UserRepository userRepository;
     private final AuthenticationManager authenticationManager;
     private final TokenService tokenService;
+    private final RedisRefreshTokenService redisRefreshTokenService;
+    private final TokenHasher tokenHasher;
 
     /**
      * A method to handle user login.
@@ -42,9 +45,9 @@ public class LoginService {
      * @since 2025-10-27
      */
     @Transactional
-    public Optional<Map<String, String>> authenticate(LoginRequest loginRequest, HttpServletResponse response) {
+    public LoginDTO authenticate(LoginRequest loginRequest, HttpServletResponse response) {
 
-        if(!loginRequest.getDeviceType().equals("web") && !loginRequest.getDeviceType().equals("mobile")) {
+        if(!(loginRequest.getDeviceType() == DeviceType.WEB) && !loginRequest.getDeviceType().equals(DeviceType.MOBILE)) {
             throw new BadRequestException("Invalid device type");
         }
 
@@ -59,6 +62,20 @@ public class LoginService {
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
+            if(loginRequest.getExistingRefreshToken() != null && !loginRequest.getExistingRefreshToken().isEmpty())  {
+
+                String existingToken = tokenHasher.hmacSha256(loginRequest.getExistingRefreshToken());
+
+                redisRefreshTokenService.revokeToken(existingToken);
+            }
+
+            if(loginRequest.getDeviceType().equals(DeviceType.WEB)) {
+                tokenService.createNewTokens(response, user, DeviceType.WEB);
+                return null;
+            } else {
+                return tokenService.createNewTokens(response, user, DeviceType.MOBILE);
+            }
+
         } catch (AuthenticationException ex) {
 
             if (ex instanceof BadCredentialsException) {
@@ -66,14 +83,6 @@ public class LoginService {
             }
             // Log or return the specific error
             throw new BadRequestException("Authentication failed: " + ex.getMessage());
-        }
-
-        if(loginRequest.getDeviceType().equals("web")) {
-            tokenService.createNewTokens(response, user);
-            return Optional.empty();
-        } else {
-            Map<String, String> tokenMap = tokenService.createNewTokens(user, true);
-            return Optional.of(tokenMap);
         }
 
     }

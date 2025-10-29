@@ -1,6 +1,8 @@
 package com.iforddow.authservice.auth.request;
 
+import com.iforddow.authservice.auth.utility.DeviceType;
 import lombok.Data;
+import org.springframework.lang.Nullable;
 
 /**
 * A request class to provide data needed
@@ -14,6 +16,8 @@ public class LoginRequest {
 
     private String email;
     private String password;
-    private String deviceType;
+    private DeviceType deviceType;
+    @Nullable
+    private String existingRefreshToken;
 
 }

@@ -1,5 +1,6 @@
 package com.iforddow.authservice.auth.service;
 
+import com.iforddow.authservice.common.service.RabbitSenderService;
 import com.iforddow.authservice.auth.bo.AuthBO;
 import com.iforddow.authservice.auth.entity.User;
 import com.iforddow.authservice.auth.repository.UserRepository;
@@ -27,6 +28,7 @@ public class RegisterService {
 
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
+    private final RabbitSenderService rabbitSenderService;
 
     /**
      * A method to handle user registration.
@@ -62,6 +64,9 @@ public class RegisterService {
 
         // Save the new user to the database
         userRepository.save(user);
+
+        // Send a message to RabbitMQ about the new user registration
+        rabbitSenderService.sendNewAccountMessage("New user registered with email: " + user.getEmail());
 
     }
 

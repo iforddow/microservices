@@ -1,5 +1,6 @@
 package com.iforddow.authservice.auth.request;
 
+import com.iforddow.authservice.auth.utility.DeviceType;
 import lombok.Data;
 
 /**
@@ -13,6 +14,6 @@ import lombok.Data;
 public class RefreshTokenRequest {
 
     private String refreshToken;
-    private String deviceType;
+    private DeviceType deviceType;
 
 }

@@ -1,9 +1,11 @@
 package com.iforddow.authservice.auth.service;
 
+import com.iforddow.authservice.auth.dto.LoginDTO;
 import com.iforddow.authservice.auth.entity.User;
 import com.iforddow.authservice.auth.repository.UserRepository;
 import com.iforddow.authservice.auth.request.RefreshTokenRequest;
 import com.iforddow.authservice.auth.service.redis.RedisRefreshTokenService;
+import com.iforddow.authservice.auth.utility.DeviceType;
 import com.iforddow.authservice.auth.utility.TokenHasher;
 import com.iforddow.authservice.common.exception.BadRequestException;
 import com.iforddow.authservice.common.exception.ResourceNotFoundException;
@@ -46,9 +48,9 @@ public class TokenService {
      * @since 2025-06-15
      */
     @Transactional
-    public Optional<Map<String, String>> refreshToken(RefreshTokenRequest refreshTokenRequest, HttpServletResponse response) {
+    public LoginDTO refreshToken(RefreshTokenRequest refreshTokenRequest, HttpServletResponse response) {
 
-        if(!refreshTokenRequest.getDeviceType().equals("mobile") && !refreshTokenRequest.getDeviceType().equals("web")) {
+        if(!(refreshTokenRequest.getDeviceType() == DeviceType.WEB) && !refreshTokenRequest.getDeviceType().equals(DeviceType.MOBILE)) {
             throw new BadRequestException("Invalid device type");
         }
 
@@ -78,12 +80,11 @@ public class TokenService {
         // Save the updated user back to the database
         userRepository.save(user);
 
-        if(refreshTokenRequest.getDeviceType().equals("web")) {
-            createNewTokens(response, user);
-            return Optional.empty();
+        if(refreshTokenRequest.getDeviceType() == DeviceType.WEB) {
+            createNewTokens(response, user, DeviceType.WEB);
+            return null;
         } else {
-            Map<String, String> tokenMap = createNewTokens(user, true);
-            return Optional.of(tokenMap);
+            return createNewTokens(response, user, DeviceType.MOBILE);
         }
 
     }
@@ -95,40 +96,30 @@ public class TokenService {
      * @author IFD
      * @since 2025-10-27
      */
-    public void createNewTokens(HttpServletResponse response, User user) {
+    public LoginDTO createNewTokens(HttpServletResponse response, User user, DeviceType deviceType) {
+
+        String newAccessToken;
 
         String newRefreshToken = jwtService.generateRefreshToken(user);
         String newHashedRefreshToken = tokenHasher.hmacSha256(newRefreshToken);
 
         redisRefreshTokenService.storeToken(newHashedRefreshToken, user.getId(), Instant.now().plusMillis(jwtService.jwtRefreshExpirationMs));
 
-        Cookie refreshCookie = new Cookie(cookieName, newRefreshToken);
+        if(deviceType == DeviceType.MOBILE) {
+            newAccessToken = jwtService.generateJwtToken(user);
+            return new LoginDTO(newAccessToken, newRefreshToken);
+        }   else {
+            Cookie refreshCookie = new Cookie(cookieName, newRefreshToken);
 
-        refreshCookie.setHttpOnly(true);
-        refreshCookie.setPath("/");
-        refreshCookie.setMaxAge(jwtService.jwtRefreshExpirationMs / 1000);
-        refreshCookie.setSecure(true);
+            refreshCookie.setHttpOnly(true);
+            refreshCookie.setPath("/");
+            refreshCookie.setMaxAge(jwtService.jwtRefreshExpirationMs / 1000);
+            refreshCookie.setSecure(true);
 
-        response.addCookie(refreshCookie);
+            response.addCookie(refreshCookie);
 
-    }
-
-    public Map<String,String> createNewTokens(User user, boolean forMobile) {
-
-        if(!forMobile) {
-            throw new BadRequestException("Invalid token");
+            return null;
         }
-
-        String newAccessToken = jwtService.generateJwtToken(user);
-        String newRefreshToken = jwtService.generateRefreshToken(user);
-        String newHashedRefreshToken = tokenHasher.hmacSha256(newRefreshToken);
-
-        redisRefreshTokenService.storeToken(newHashedRefreshToken, user.getId(), Instant.now().plusMillis(jwtService.jwtRefreshExpirationMs));
-
-        return Map.of(
-                "accessToken", newAccessToken,
-                "refreshToken", newRefreshToken
-        );
 
     }
 
