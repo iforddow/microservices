@@ -72,7 +72,7 @@ public class LoginService {
             tokenService.createNewTokens(response, user);
             return Optional.empty();
         } else {
-            Map<String, String> tokenMap = tokenService.createNewTokens(response, user, true);
+            Map<String, String> tokenMap = tokenService.createNewTokens(user, true);
             return Optional.of(tokenMap);
         }
 

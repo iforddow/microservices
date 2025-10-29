@@ -82,7 +82,7 @@ public class TokenService {
             createNewTokens(response, user);
             return Optional.empty();
         } else {
-            Map<String, String> tokenMap = createNewTokens(response, user, true);
+            Map<String, String> tokenMap = createNewTokens(user, true);
             return Optional.of(tokenMap);
         }
 
@@ -113,7 +113,7 @@ public class TokenService {
 
     }
 
-    public Map<String,String> createNewTokens(HttpServletResponse response, User user, boolean forMobile) {
+    public Map<String,String> createNewTokens(User user, boolean forMobile) {
 
         if(!forMobile) {
             throw new BadRequestException("Invalid token");
@@ -125,12 +125,10 @@ public class TokenService {
 
         redisRefreshTokenService.storeToken(newHashedRefreshToken, user.getId(), Instant.now().plusMillis(jwtService.jwtRefreshExpirationMs));
 
-        Map<String, String> map = new HashMap<>();
-
-        map.put("accessToken", newAccessToken);
-        map.put("refreshToken", newRefreshToken);
-
-        return map;
+        return Map.of(
+                "accessToken", newAccessToken,
+                "refreshToken", newRefreshToken
+        );
 
     }
 

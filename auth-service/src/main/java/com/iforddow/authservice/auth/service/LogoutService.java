@@ -1,6 +1,5 @@
 package com.iforddow.authservice.auth.service;
 
-import com.iforddow.authservice.auth.repository.UserRepository;
 import com.iforddow.authservice.auth.request.LogoutRequest;
 import com.iforddow.authservice.auth.service.redis.RedisRefreshTokenService;
 import com.iforddow.authservice.auth.utility.TokenHasher;
@@ -26,7 +25,6 @@ import java.util.UUID;
 @Service
 public class LogoutService {
 
-    private final UserRepository userRepository;
     private final TokenHasher tokenHasher;
     private final RedisRefreshTokenService redisRefreshTokenService;
 

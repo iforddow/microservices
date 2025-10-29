@@ -1,9 +1,18 @@
 package com.iforddow.authservice.auth.bo;
 
 import com.iforddow.authservice.auth.request.RegisterRequest;
+import com.iforddow.authservice.common.utility.AuthServiceUtility;
 
 import java.util.ArrayList;
 
+/**
+* A business logic class for validation according to
+* my standards. Which standard password protocols and
+* no weird emails.
+*
+* @author IFD
+* @since 2025-10-28
+* */
 public class AuthBO {
 
     /**
@@ -21,7 +30,7 @@ public class AuthBO {
         String confirmPassword = registerRequest.getConfirmPassword();
 
         // Simple regex for basic email validation
-        String emailRegex = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$";
+        String emailRegex = "^(?!.*\\.\\.)(?!\\.)[A-Za-z0-9._%+-]+(?<!\\.)@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$";
 
         if (email == null) {
             errors.add("Email is required");
@@ -31,14 +40,18 @@ public class AuthBO {
             }
         }
 
-        if (password == null) {
+        if (AuthServiceUtility.isNullOrEmpty(registerRequest.getConfirmPassword())) {
             errors.add("Password is required");
         } else {
+            if(AuthServiceUtility.isNullOrEmpty(confirmPassword)) {
+                errors.add("Confirm password cannot be empty");
+            }
+
             if (!password.equals(confirmPassword)) {
                 errors.add("Passwords do not match");
             }
 
-            ArrayList<String> passwordValidationErrors = validatePassword(password);
+            ArrayList<String> passwordValidationErrors = validatePassword(password, confirmPassword);
 
             if(passwordValidationErrors != null) {
                 errors.addAll(passwordValidationErrors);

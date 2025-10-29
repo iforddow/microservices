@@ -19,11 +19,15 @@ public class RedisRefreshTokenService {
     private final StringRedisTemplate stringRedisTemplate;
 
     @Value("${spring.data.redis.prefix}")
-    private static String servicePrefix;
+    private String servicePrefix;
 
-    private static final String TOKEN_PREFIX = servicePrefix +  "refreshToken:";
-    private static final String USER_TOKENS_PREFIX = servicePrefix + "userTokens:";
+    private String getTokenPrefix() {
+        return  servicePrefix + "refreshToken:";
+    }
 
+    private String getUserTokensPrefix() {
+        return  servicePrefix + "userTokens:";
+    }
 
     /**
      * A method to store a refresh token in the redis
@@ -33,8 +37,8 @@ public class RedisRefreshTokenService {
      * @since 2025-07-20
      * */
     public void storeToken(String hashedToken, UUID uuid, Instant expiresAt) {
-        String tokenKey = TOKEN_PREFIX + hashedToken;
-        String userTokensKey = USER_TOKENS_PREFIX + uuid.toString();
+        String tokenKey = getTokenPrefix() + hashedToken;
+        String userTokensKey = getUserTokensPrefix() + uuid.toString();
 
         Duration ttl = Duration.between(Instant.now(), expiresAt);
 
@@ -51,7 +55,7 @@ public class RedisRefreshTokenService {
      * @since 2025-07-20
      * */
     public UUID getUserIdFromToken(String hashedToken) {
-        String tokenKey = TOKEN_PREFIX + hashedToken;
+        String tokenKey = getTokenPrefix() + hashedToken;
 
         String value = stringRedisTemplate.opsForValue().get(tokenKey);
 
@@ -65,13 +69,13 @@ public class RedisRefreshTokenService {
      * @since 2025-07-20
      * */
     public void revokeToken(String hashedToken) {
-        String tokenKey = TOKEN_PREFIX + hashedToken;
+        String tokenKey = getTokenPrefix() + hashedToken;
 
         // Get userId to remove token from user set
         String userIdStr = stringRedisTemplate.opsForValue().get(tokenKey);
 
         if (userIdStr != null) {
-            String userTokensKey = USER_TOKENS_PREFIX + userIdStr;
+            String userTokensKey = getUserTokensPrefix() + userIdStr;
 
             // Remove token from user's token set
             stringRedisTemplate.opsForSet().remove(userTokensKey, hashedToken);
@@ -89,13 +93,13 @@ public class RedisRefreshTokenService {
      * @since 2025-07-25
      * */
     public void revokeAllTokensForUser(UUID uuid) {
-        String userTokensKey = USER_TOKENS_PREFIX + uuid.toString();
+        String userTokensKey = getUserTokensPrefix() + uuid.toString();
 
         Set<String> userTokens = stringRedisTemplate.opsForSet().members(userTokensKey);
 
         if (userTokens != null && !userTokens.isEmpty()) {
             List<String> tokenKeys = userTokens.stream()
-                    .map(token -> TOKEN_PREFIX + token)
+                    .map(token -> getTokenPrefix() + token)
                     .collect(Collectors.toList());
             stringRedisTemplate.delete(tokenKeys);
         }
