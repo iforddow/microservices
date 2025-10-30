@@ -13,6 +13,7 @@ import com.iforddow.authservice.common.exception.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -20,6 +21,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+
+import java.util.Set;
 
 /**
  * A service class for user login methods.
@@ -37,6 +40,9 @@ public class LoginService {
     private final RedisRefreshTokenService redisRefreshTokenService;
     private final TokenHasher tokenHasher;
 
+    @Value("${auth.max.sessions}")
+    private int MAX_CONCURRENT_SESSIONS;
+
     /**
      * A method to handle user login.
      *
@@ -47,28 +53,52 @@ public class LoginService {
     @Transactional
     public LoginDTO authenticate(LoginRequest loginRequest, HttpServletResponse response) {
 
+        // Ensure device type is valid
         if(!(loginRequest.getDeviceType() == DeviceType.WEB) && !loginRequest.getDeviceType().equals(DeviceType.MOBILE)) {
             throw new BadRequestException("Invalid device type");
         }
 
+        // Ensure user exists
         User user = userRepository.findUserByEmail(loginRequest.getEmail()).orElseThrow(
                 () -> new ResourceNotFoundException("User email not found")
         );
 
+        // Try to authenticate user
         try {
+
+            // Perform authentication
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword())
             );
 
+            // Set authentication in security context
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
+            // Revoke existing refresh token if provided
+            // This is useful if somehow the user hits the login endpoint
+            // while already logged in on the same device
             if(loginRequest.getExistingRefreshToken() != null && !loginRequest.getExistingRefreshToken().isEmpty())  {
 
+                // Hash the existing refresh token
                 String existingToken = tokenHasher.hmacSha256(loginRequest.getExistingRefreshToken());
 
+                // Revoke the existing token
                 redisRefreshTokenService.revokeToken(existingToken);
             }
 
+            // Get all valid tokens for the user
+            Set<String> validTokens = redisRefreshTokenService.getValidTokensForUser(user.getId());
+
+            // If user has reached max concurrent sessions, revoke the oldest tokens
+            if(validTokens.size() >= MAX_CONCURRENT_SESSIONS) {
+                int tokensToRevoke = validTokens.size() - MAX_CONCURRENT_SESSIONS + 1;
+
+                redisRefreshTokenService.revokeOldestTokens(user.getId(), tokensToRevoke);
+            }
+
+            // Create new tokens based on device type
+            // We do this because web only needs refresh cookie
+            // whereas mobile needs both access and refresh tokens in response body
             if(loginRequest.getDeviceType().equals(DeviceType.WEB)) {
                 tokenService.createNewTokens(response, user, DeviceType.WEB);
                 return null;
@@ -78,6 +108,7 @@ public class LoginService {
 
         } catch (AuthenticationException ex) {
 
+            // Handle invalid credentials
             if (ex instanceof BadCredentialsException) {
                 throw new InvalidCredentialsException("Invalid credentials provided");
             }
