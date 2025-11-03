@@ -4,7 +4,6 @@ import com.iforddow.authservice.auth.dto.LoginDTO;
 import com.iforddow.authservice.auth.entity.User;
 import com.iforddow.authservice.auth.repository.UserRepository;
 import com.iforddow.authservice.auth.request.LoginRequest;
-import com.iforddow.authservice.auth.service.redis.RedisRefreshTokenService;
 import com.iforddow.authservice.auth.utility.DeviceType;
 import com.iforddow.authservice.auth.utility.TokenHasher;
 import com.iforddow.authservice.common.exception.BadRequestException;

@@ -4,11 +4,11 @@ import com.iforddow.authservice.auth.dto.LoginDTO;
 import com.iforddow.authservice.auth.entity.User;
 import com.iforddow.authservice.auth.repository.UserRepository;
 import com.iforddow.authservice.auth.request.RefreshTokenRequest;
-import com.iforddow.authservice.auth.service.redis.RedisRefreshTokenService;
 import com.iforddow.authservice.auth.utility.DeviceType;
 import com.iforddow.authservice.auth.utility.TokenHasher;
 import com.iforddow.authservice.common.exception.BadRequestException;
 import com.iforddow.authservice.common.exception.ResourceNotFoundException;
+import com.iforddow.authservice.common.exception.UnauthorizedException;
 import com.iforddow.authservice.common.security.JwtService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
@@ -47,7 +47,6 @@ public class TokenService {
      * @author IFD
      * @since 2025-06-15
      */
-    @Transactional
     public LoginDTO refreshToken(RefreshTokenRequest refreshTokenRequest, HttpServletResponse response) {
 
         if(!(refreshTokenRequest.getDeviceType() == DeviceType.WEB) && !refreshTokenRequest.getDeviceType().equals(DeviceType.MOBILE)) {
@@ -57,7 +56,7 @@ public class TokenService {
         String refreshToken = refreshTokenRequest.getRefreshToken();
 
         if(!jwtService.validateJwtToken(refreshToken)) {
-            throw new BadRequestException("Invalid token");
+            throw new UnauthorizedException("Invalid token");
         }
 
         String hashedRefreshToken = tokenHasher.hmacSha256(refreshToken);
@@ -65,20 +64,14 @@ public class TokenService {
         UUID userId = redisRefreshTokenService.getUserIdFromToken(hashedRefreshToken);
 
         if(userId == null) {
-            throw new BadRequestException("Invalid token");
+            throw new BadRequestException("User id not found for the provided token");
         }
 
         User user = userRepository.findById(userId).orElseThrow(
-                () -> new ResourceNotFoundException("User not found")
+                () -> new ResourceNotFoundException("User not found in database")
         );
 
         redisRefreshTokenService.revokeToken(hashedRefreshToken);
-
-        // Update the user's last active time
-        user.setLastActive(new Date().toInstant());
-
-        // Save the updated user back to the database
-        userRepository.save(user);
 
         if(refreshTokenRequest.getDeviceType() == DeviceType.WEB) {
             createNewTokens(response, user, DeviceType.WEB);

@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -21,6 +22,7 @@ import java.util.UUID;
  * @author IFD
  * @since  2025-10-27
  * */
+@RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
 
     // Initialize the JwtService
@@ -28,20 +30,6 @@ public class JwtFilter extends OncePerRequestFilter {
 
     // Initialize the UserDetailsService
     private final UserDetailsServiceImpl userDetailsServiceImpl;
-
-    /**
-     * A constructor for the JwtFilter class.
-     *
-     * @param jwtService The service used for JWT operations.
-     * @param userDetailsServiceImpl The service used to load user details.
-     *
-     * @author IFD
-     * @since 2025-06-15
-     * */
-    public JwtFilter(JwtService jwtService, UserDetailsServiceImpl userDetailsServiceImpl) {
-        this.jwtService = jwtService;
-        this.userDetailsServiceImpl = userDetailsServiceImpl;
-    }
 
     /**
      * A filter that intercepts HTTP requests to check for JWT tokens in the Authorization header.

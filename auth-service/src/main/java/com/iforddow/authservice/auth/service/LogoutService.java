@@ -1,7 +1,6 @@
 package com.iforddow.authservice.auth.service;
 
 import com.iforddow.authservice.auth.request.LogoutRequest;
-import com.iforddow.authservice.auth.service.redis.RedisRefreshTokenService;
 import com.iforddow.authservice.auth.utility.TokenHasher;
 import com.iforddow.authservice.common.exception.BadRequestException;
 import com.iforddow.authservice.common.utility.AuthServiceUtility;
@@ -39,7 +38,6 @@ public class LogoutService {
      * @author IFD
      * @since 2025-10-27
      */
-    @Transactional
     public void logout(LogoutRequest logoutRequest, HttpServletResponse response) {
 
         try {

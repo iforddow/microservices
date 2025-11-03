@@ -37,7 +37,6 @@ public class RegisterService {
      * @author IFD
      * @since 2025-06-14
      */
-    @Transactional
     public void register(RegisterRequest registerRequest, HttpServletResponse response) {
 
         AuthBO authBO = new AuthBO();
@@ -66,7 +65,7 @@ public class RegisterService {
         userRepository.save(user);
 
         // Send a message to RabbitMQ about the new user registration
-        rabbitSenderService.sendNewAccountMessage("New user registered with email: " + user.getEmail());
+        rabbitSenderService.sendNewAccountMessage(user.getId().toString());
 
     }
 

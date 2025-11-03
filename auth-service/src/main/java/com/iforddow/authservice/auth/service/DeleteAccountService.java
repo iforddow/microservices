@@ -38,7 +38,7 @@ public class DeleteAccountService {
 
         userRepository.delete(user);
 
-        rabbitSenderService.sendDeletedAccountMessage("User deleted with id: " + userId);
+        rabbitSenderService.sendDeletedAccountMessage(userId.toString());
 
 
     }
