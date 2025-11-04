@@ -8,7 +8,6 @@ import com.iforddow.authservice.auth.request.RegisterRequest;
 import com.iforddow.authservice.common.exception.BadRequestException;
 import com.iforddow.authservice.common.exception.ResourceExistsException;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;

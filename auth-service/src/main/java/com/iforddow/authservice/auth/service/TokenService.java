@@ -12,7 +12,6 @@ import com.iforddow.authservice.common.exception.UnauthorizedException;
 import com.iforddow.authservice.common.security.JwtService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;

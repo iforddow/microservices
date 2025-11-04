@@ -9,6 +9,7 @@ import com.iforddow.authservice.auth.utility.TokenHasher;
 import com.iforddow.authservice.common.exception.BadRequestException;
 import com.iforddow.authservice.common.exception.InvalidCredentialsException;
 import com.iforddow.authservice.common.exception.ResourceNotFoundException;
+import com.iforddow.authservice.common.service.SmsService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,8 @@ public class LoginService {
 
     @Value("${auth.max.sessions}")
     private int MAX_CONCURRENT_SESSIONS;
+
+    private final SmsService smsService;
 
     /**
      * A method to handle user login.
@@ -98,11 +101,23 @@ public class LoginService {
             // Create new tokens based on device type
             // We do this because web only needs refresh cookie
             // whereas mobile needs both access and refresh tokens in response body
-            if(loginRequest.getDeviceType().equals(DeviceType.WEB)) {
-                tokenService.createNewTokens(response, user, DeviceType.WEB);
-                return null;
-            } else {
-                return tokenService.createNewTokens(response, user, DeviceType.MOBILE);
+            try {
+                if(loginRequest.getDeviceType().equals(DeviceType.WEB)) {
+                    tokenService.createNewTokens(response, user, DeviceType.WEB);
+                    return null;
+                } else {
+                    return tokenService.createNewTokens(response, user, DeviceType.MOBILE);
+                }
+            } catch (AuthenticationException e) {
+                throw new BadRequestException("Token generation failed: " + e.getMessage());
+            } finally {
+                // Send login notification SMS
+                try {
+                    smsService.sendSms("+19023936781", "Test message");
+                } catch (Exception e) {
+                    // Log the SMS sending failure but do not interrupt the login process
+                    System.err.println("Failed to send SMS notification: " + e.getMessage());
+                }
             }
 
         } catch (AuthenticationException ex) {
