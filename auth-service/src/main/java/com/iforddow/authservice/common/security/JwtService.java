@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.time.Instant;
 import java.util.Date;
 
 /**
@@ -89,6 +90,23 @@ public class JwtService {
                 .parseClaimsJws(token)
                 .getBody()
                 .getSubject();
+    }
+
+    /**
+    * A method to extract the expiration time from a JWT token.
+    *
+    * @param token The JWT token from which to extract the expiration time.
+    * @return The expiration time as an Instant.
+    *
+    * @author IFD
+    * @since 2025-11-04
+    * */
+    public Instant getExpirationFromToken(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(getKey()).build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getExpiration().toInstant();
     }
 
     /**

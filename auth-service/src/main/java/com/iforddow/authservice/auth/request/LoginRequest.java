@@ -17,7 +17,5 @@ public class LoginRequest {
     private String email;
     private String password;
     private DeviceType deviceType;
-    @Nullable
-    private String existingRefreshToken;
 
 }

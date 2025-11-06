@@ -2,6 +2,7 @@ package com.iforddow.authservice.common.service;
 
 import com.iforddow.authservice.common.config.RabbitConfig;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 * @author IFD
 * @since 2025-10-29
 * */
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class RabbitSenderService {
@@ -24,11 +26,15 @@ public class RabbitSenderService {
     * @since 2025-10-29
     * */
     public void sendNewAccountMessage(String message) {
-        rabbitTemplate.convertAndSend(
-                RabbitConfig.NEW_ACCOUNT_EXCHANGE,
-                RabbitConfig.NEW_ACCOUNT_ROUTING_KEY,
-                message
-        );
+        try {
+            rabbitTemplate.convertAndSend(
+                    RabbitConfig.NEW_ACCOUNT_EXCHANGE,
+                    RabbitConfig.NEW_ACCOUNT_ROUTING_KEY,
+                    message
+            );
+        } catch (Exception e) {
+            log.warn("Failed to send new account message: {}", e.getMessage());
+        }
     }
 
     /**

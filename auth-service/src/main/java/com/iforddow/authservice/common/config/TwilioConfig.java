@@ -7,6 +7,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+* A configuration class for Twilio integration.
+*
+* @author IFD
+* @since 2025-11-04
+* */
 @Configuration
 public class TwilioConfig {
 
@@ -25,11 +31,23 @@ public class TwilioConfig {
     @Value("${twilio.phone.number}")
     private String twilioPhoneNumber;
 
+    /**
+    * A method to initialize Twilio with the live credentials.
+    *
+    * @author IFD
+    * @since 2025-11-04
+    * */
     @PostConstruct
     public void init() {
-        Twilio.init(testAccountSid, testAuthToken);
+        Twilio.init(liveAccountSid, liveAuthToken);
     }
 
+    /**
+    * A bean to provide TwilioRestClient for sending SMS.
+    *
+    * @author IFD
+    * @since 2025-11-04
+    * */
     @Bean
     public TwilioRestClient twilioRestClient() {
         return Twilio.getRestClient();

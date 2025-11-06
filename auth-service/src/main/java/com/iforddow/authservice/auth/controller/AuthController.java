@@ -1,19 +1,13 @@
 package com.iforddow.authservice.auth.controller;
 
-import com.iforddow.authservice.auth.dto.LoginDTO;
-import com.iforddow.authservice.auth.request.LoginRequest;
-import com.iforddow.authservice.auth.request.LogoutRequest;
-import com.iforddow.authservice.auth.request.RefreshTokenRequest;
-import com.iforddow.authservice.auth.request.RegisterRequest;
+import com.iforddow.authservice.auth.request.*;
 import com.iforddow.authservice.auth.service.*;
-import com.iforddow.authservice.auth.utility.PermissionCheck;
+import com.iforddow.authservice.common.security.JwtService;
 import com.iforddow.authservice.common.utility.AuthServiceUtility;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.UUID;
 
 /**
  * A controller class to handle authentication
@@ -28,11 +22,12 @@ import java.util.UUID;
 public class AuthController {
 
     private final RegisterService registerService;
-    private final LoginService loginService;
+    private final AuthenticationService authenticationService;
     private final DeleteAccountService deleteAccountService;
     private final LogoutService logoutService;
-    private final PermissionCheck permissionCheck;
     private final TokenService tokenService;
+    private final PasswordService passwordService;
+    private final JwtService jwtService;
 
     /**
      * An endpoint for accessing the registration method.
@@ -42,14 +37,15 @@ public class AuthController {
      *
      */
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody(required = false) RegisterRequest registerRequest, HttpServletResponse response) {
+    public ResponseEntity<?> register(
+            @CookieValue(value = "${jwt.cookie.name}", required = false) String cookieValue,
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestBody RegisterRequest registerRequest, HttpServletResponse response) {
 
-        if (registerRequest == null) {
-            return ResponseEntity.badRequest().body("Invalid registration request");
-        }
+        String existingToken = tokenService.ensureOneToken(cookieValue, authHeader);
 
         try {
-            registerService.register(registerRequest, response);
+            registerService.register(registerRequest, existingToken, response);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -65,26 +61,16 @@ public class AuthController {
      *
      */
     @PostMapping("/authenticate")
-    public ResponseEntity<LoginDTO> authenticate(
+    public ResponseEntity<?> authenticate(
             @CookieValue(value = "${jwt.cookie.name}", required = false) String cookieValue,
-            @RequestBody(required = false) LoginRequest loginRequest,
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestBody LoginRequest loginRequest,
             HttpServletResponse response) {
 
-        //Make sure the login request is valid
-        if (loginRequest == null) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        //If there is an existing refresh token cookie, set it in the login request
-        //Only for Web scenarios where mobile apps won't have cookies so the refresh token
-        //is already expected to be in the request body
-        if (!AuthServiceUtility.isNullOrEmpty(cookieValue)) {
-            loginRequest.setExistingRefreshToken(cookieValue);
-        }
+        String existingToken = tokenService.ensureOneToken(cookieValue, authHeader);
 
         try {
-            LoginDTO loginResult = loginService.authenticate(loginRequest, response);
-
+            String loginResult = authenticationService.authenticate(loginRequest, existingToken, response);
             return ResponseEntity.ok(loginResult);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
@@ -92,7 +78,7 @@ public class AuthController {
 
     }
 
-    /*
+    /**
     * An endpoint for accessing the logout method.
     *
     * @author IFD
@@ -101,28 +87,13 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<?> logout(
             @CookieValue(value = "${jwt.cookie.name}", required = false) String cookieValue,
-            @RequestBody(required = false) LogoutRequest logoutRequest, HttpServletResponse response) {
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestBody LogoutRequest logoutRequest, HttpServletResponse response) {
 
-        if (logoutRequest == null) {
-            return ResponseEntity.badRequest().body("Invalid logout request");
-        }
-
-        //If there is an existing refresh token cookie, set it in the logout request
-        //Only for Web scenarios where mobile apps won't have cookies so the refresh token
-        //is already expected to be in the request body
-        if(!AuthServiceUtility.isNullOrEmpty(cookieValue)) {
-            logoutRequest.setRefreshToken(cookieValue);
-        }
-
-        //This essentially checks that there is a refresh token to log out with
-        //regardless of whether it came from the cookie or the request body
-        //if no cookie provided we assume the user is not logged in
-        if(logoutRequest.getRefreshToken() == null) {
-            return ResponseEntity.badRequest().body("Refresh token not found, logout failed");
-        }
+        String existingToken = tokenService.ensureOneToken(cookieValue, authHeader);
 
         try {
-            logoutService.logout(logoutRequest, response);
+            logoutService.logout(logoutRequest, existingToken, response);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -130,7 +101,7 @@ public class AuthController {
 
     }
 
-    /*
+    /**
     * A controller endpoint for accessing the token refresh method.
     *
     * @author IFD
@@ -159,7 +130,7 @@ public class AuthController {
         }
 
         try {
-            LoginDTO refreshResult = tokenService.refreshToken(refreshTokenRequest, response);
+            String refreshResult = authenticationService.refreshToken(refreshTokenRequest, response);
 
             return ResponseEntity.ok(refreshResult);
         } catch (Exception e) {
@@ -174,19 +145,18 @@ public class AuthController {
      * @since 2025-10-29
      *
      */
-    @DeleteMapping("/delete/{userId}")
-    public ResponseEntity<?> deleteAccount(@PathVariable String userId,
-                                           @CookieValue(value = "${jwt.cookie.name}", required = false) String cookieValue,
+    @DeleteMapping("/delete")
+    public ResponseEntity<?> deleteAccount(@CookieValue(value = "${jwt.cookie.name}", required = false) String cookieValue,
                                            @RequestHeader(value = "Authorization", required = false) String authHeader) {
-
-        if(!permissionCheck.checkIsAccountOwner(userId, cookieValue, authHeader)) {
-            return ResponseEntity.status(403).body("Access denied: You do not have permission to access this resource");
-        }
-
         try {
-            UUID id = UUID.fromString(userId);
+            if(!AuthServiceUtility.isNullOrEmpty(cookieValue)) {
+                deleteAccountService.deleteAccount(cookieValue);
+            } else if(!AuthServiceUtility.isNullOrEmpty(authHeader)) {
+                deleteAccountService.deleteAccount(authHeader);
+            } else {
+                return ResponseEntity.badRequest().body("No authentication method provided");
+            }
 
-            deleteAccountService.deleteAccount(id);
             return ResponseEntity.ok().body("User deleted successfully");
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -194,4 +164,25 @@ public class AuthController {
 
     }
 
+    /**
+    * An endpoint to change a user's password.
+    *
+    * @author IFD
+    * @since 2025-11-02
+    * */
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changeAccountPassword(@CookieValue(value = "${jwt.cookie.name}", required = false) String cookieValue,
+                                                   @RequestHeader(value = "Authorization", required = false) String authHeader,
+                                                   @RequestBody ChangePasswordRequest changePasswordRequest) {
+
+        jwtService.getUserIdFromToken(authHeader);
+
+        try {
+            passwordService.changeUserPassword(changePasswordRequest);
+            return ResponseEntity.ok().body("Password changed successfully");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Unable to change password: " + e.getMessage());
+        }
+
+    }
 }

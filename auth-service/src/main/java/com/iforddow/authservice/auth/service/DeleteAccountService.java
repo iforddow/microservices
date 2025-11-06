@@ -1,10 +1,14 @@
 package com.iforddow.authservice.auth.service;
 
+import com.iforddow.authservice.application.events.DeleteAccountEvent;
 import com.iforddow.authservice.auth.entity.User;
 import com.iforddow.authservice.auth.repository.UserRepository;
+import com.iforddow.authservice.common.exception.BadRequestException;
 import com.iforddow.authservice.common.exception.ResourceNotFoundException;
-import com.iforddow.authservice.common.service.RabbitSenderService;
+import com.iforddow.authservice.common.security.JwtService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -20,17 +24,29 @@ import java.util.UUID;
 public class DeleteAccountService {
 
     private final UserRepository userRepository;
-    private final RabbitSenderService rabbitSenderService;
+    private final JwtService jwtService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final TokenService tokenService;
+
 
     /**
     * A method to delete a user account by user ID.
     *
-    * @param userId The UUID of the user to be deleted.
+    * @param authToken The authentication token of the user.
     *
     * @author IFD
     * @since 2025-10-29
     * */
-    public void deleteAccount(UUID userId) {
+    @Transactional
+    public void deleteAccount(String authToken) {
+
+        String token = tokenService.extractTokenFromHeader(authToken);
+
+        if(!jwtService.validateJwtToken(token)) {
+            throw new BadRequestException("Invalid JWT token");
+        }
+
+        UUID userId = UUID.fromString(jwtService.getUserIdFromToken(token));
 
         User user = userRepository.findById(userId).orElseThrow(
                 () -> new ResourceNotFoundException("User not found with id: " + userId)
@@ -38,8 +54,7 @@ public class DeleteAccountService {
 
         userRepository.delete(user);
 
-        rabbitSenderService.sendDeletedAccountMessage(userId.toString());
-
+        eventPublisher.publishEvent(new DeleteAccountEvent(userId));
 
     }
 

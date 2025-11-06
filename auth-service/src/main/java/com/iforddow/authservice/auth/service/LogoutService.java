@@ -1,7 +1,6 @@
 package com.iforddow.authservice.auth.service;
 
 import com.iforddow.authservice.auth.request.LogoutRequest;
-import com.iforddow.authservice.auth.utility.TokenHasher;
 import com.iforddow.authservice.common.exception.BadRequestException;
 import com.iforddow.authservice.common.utility.AuthServiceUtility;
 import jakarta.servlet.http.Cookie;
@@ -23,8 +22,8 @@ import java.util.UUID;
 @Service
 public class LogoutService {
 
-    private final TokenHasher tokenHasher;
     private final RedisRefreshTokenService redisRefreshTokenService;
+    private final TokenService tokenService;
 
     @Value("${jwt.cookie.name}")
     private String cookieName;
@@ -37,31 +36,45 @@ public class LogoutService {
      * @author IFD
      * @since 2025-10-27
      */
-    public void logout(LogoutRequest logoutRequest, HttpServletResponse response) {
+    public void logout(LogoutRequest logoutRequest, String existingToken, HttpServletResponse response) {
 
+        // Use try-finally to ensure cookie is removed
         try {
-            String refreshToken = logoutRequest.getRefreshToken();
 
-            if (AuthServiceUtility.isNullOrEmpty(refreshToken)) {
-                throw new BadRequestException("Refresh token is missing or empty");
+            if (AuthServiceUtility.isNullOrEmpty(existingToken)) {
+                throw new BadRequestException("No authentication session found.");
             }
 
-            String hashedRefreshToken = tokenHasher.hmacSha256(refreshToken);
+            String hashedRefreshToken = tokenService.hmacSha256(existingToken);
 
+            // If all devices is true, revoke all tokens for the user (logout from all devices)
             if (logoutRequest.isAllDevices()) {
+
+                // Get user ID from the refresh token
                 UUID userId = redisRefreshTokenService.getUserIdFromToken(hashedRefreshToken);
 
+                // If no user ID found, throw an exception
                 if(userId == null) {
-                    throw new BadRequestException("Invalid user refresh token");
+                    throw new BadRequestException("Could not find user for the provided token.");
                 }
+
+                // Revoke all refresh tokens for the user
                 redisRefreshTokenService.revokeAllTokensForUser(userId);
             } else {
+
+                // Revoke only the current refresh token
                 redisRefreshTokenService.revokeToken(hashedRefreshToken);
             }
 
         } finally {
 
             // Invalidate the refresh token by setting it to null
+            // This will remove the cookie from the client side
+            // no matter what happens in the try block.
+            //
+            // If the user is on mobile this cookie won't exist,
+            // but this won't cause any issues.
+
             Cookie cookie = new Cookie(cookieName, null);
             cookie.setHttpOnly(true);
             cookie.setPath("/");
