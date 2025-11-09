@@ -33,9 +33,9 @@ public class JwtService {
     @Value("${jwt.access_expiration}")
     public int jwtExpirationMs;
 
-    // The expiration time for the refresh token in milliseconds
-    @Value("${jwt.refresh_expiration}")
-    public int jwtRefreshExpirationMs;
+    // The expiration time for the session token in milliseconds
+    @Value("${jwt.session_expiration}")
+    public int jwtSessionExpirationMs;
 
     /**
      * A method to generate a JWT token for a user.
@@ -57,20 +57,20 @@ public class JwtService {
     }
 
     /**
-     * A method to generate a refresh token for a user.
+     * A method to generate a session token for a user.
      *
-     * @param user The username for which to generate the refresh token.
-     * @return A JWT refresh token as a String.
+     * @param user The username for which to generate the session token.
+     * @return A JWT session token as a String.
      *
      * @author IFD
      * @since  2025-06-15
      * */
-    public String generateRefreshToken(User user) {
+    public String generateSessionToken(User user) {
         return Jwts.builder()
                 .setSubject(user.getId().toString())
                 .claim("email", user.getEmail())
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + jwtRefreshExpirationMs))
+                .setExpiration(new Date(System.currentTimeMillis() + jwtSessionExpirationMs))
                 .signWith(getKey())
                 .compact();
     }

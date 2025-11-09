@@ -26,7 +26,7 @@ public class DeleteAccountService {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final ApplicationEventPublisher eventPublisher;
-    private final TokenService tokenService;
+    private final SessionTokenService sessionTokenService;
 
 
     /**
@@ -40,7 +40,7 @@ public class DeleteAccountService {
     @Transactional
     public void deleteAccount(String authToken) {
 
-        String token = tokenService.extractTokenFromHeader(authToken);
+        String token = sessionTokenService.extractTokenFromHeader(authToken);
 
         if(!jwtService.validateJwtToken(token)) {
             throw new BadRequestException("Invalid JWT token");

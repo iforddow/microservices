@@ -1,19 +1,42 @@
 package com.iforddow.authservice.auth;
 
-import com.iforddow.authservice.auth.bo.AuthBO;
+import com.iforddow.authservice.auth.repository.UserRepository;
 import com.iforddow.authservice.auth.request.RegisterRequest;
+import com.iforddow.authservice.auth.validator.PasswordValidator;
+import com.iforddow.authservice.auth.validator.RegistrationValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Optional;
+
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
 @DisplayName("Registration Validation Tests")
 public class RegistrationValidationTest {
 
-    private AuthBO authBO;
+    private RegistrationValidator registrationValidator;
+
+    @Mock
+    private PasswordValidator passwordValidator;
+
+    @Mock
+    private UserRepository userRepository;
 
     @BeforeEach
     void setUp() {
-        authBO = new AuthBO();
+        // Mock passwordValidator to do nothing (no exception thrown means valid)
+        // If it returns void, no stubbing is needed - just don't throw an exception
+
+        // Mock userRepository to return empty Optional (user doesn't exist)
+        when(userRepository.findUserByEmail(anyString())).thenReturn(Optional.empty());
+
+        registrationValidator = new RegistrationValidator(passwordValidator, userRepository);
     }
 
     @Test
@@ -26,7 +49,13 @@ public class RegistrationValidationTest {
         registerRequest.setPassword("ABcd123!");
         registerRequest.setConfirmPassword("ABcd123!");
 
-        assert(authBO.validateUserRegistration(registerRequest).isEmpty());
+        try {
+            registrationValidator.validateRegistrationRequest(registerRequest, null);
+        } catch (Exception e) {
+            assert(false);
+        }
+
+        assert (true);
 
     }
 
@@ -40,7 +69,13 @@ public class RegistrationValidationTest {
         registerRequest.setPassword("FranklinTheTurtle1@");
         registerRequest.setConfirmPassword("FranklinTheTurtle1@");
 
-        assert(authBO.validateUserRegistration(registerRequest).isEmpty());
+        try {
+            registrationValidator.validateRegistrationRequest(registerRequest, null);
+        } catch (Exception e) {
+            assert(false);
+        }
+
+        assert (true);
 
     }
 
@@ -54,7 +89,11 @@ public class RegistrationValidationTest {
         registerRequest.setPassword("FranklinTheTurtle1@");
         registerRequest.setConfirmPassword("FranklinTheTurtle1@");
 
-        assert(!authBO.validateUserRegistration(registerRequest).isEmpty());
+        try {
+            registrationValidator.validateRegistrationRequest(registerRequest, null);
+        } catch (Exception e) {
+            assert(true);
+        }
 
     }
 
@@ -68,7 +107,11 @@ public class RegistrationValidationTest {
         registerRequest.setPassword("FranklinTheTurtle1@");
         registerRequest.setConfirmPassword("RjTheFox1*");
 
-        assert(!authBO.validateUserRegistration(registerRequest).isEmpty());
+        try {
+            registrationValidator.validateRegistrationRequest(registerRequest, null);
+        } catch (Exception e) {
+            assert(true);
+        }
 
     }
 

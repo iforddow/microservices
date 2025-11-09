@@ -3,6 +3,7 @@ package com.iforddow.authservice.auth.service;
 import com.iforddow.authservice.auth.request.LogoutRequest;
 import com.iforddow.authservice.common.exception.BadRequestException;
 import com.iforddow.authservice.common.utility.AuthServiceUtility;
+import com.iforddow.authservice.common.utility.HashUtil;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -22,8 +23,8 @@ import java.util.UUID;
 @Service
 public class LogoutService {
 
-    private final RedisRefreshTokenService redisRefreshTokenService;
-    private final TokenService tokenService;
+    private final RedisSessionTokenService redisSessionTokenService;
+    private final HashUtil hashUtil;
 
     @Value("${jwt.cookie.name}")
     private String cookieName;
@@ -45,30 +46,30 @@ public class LogoutService {
                 throw new BadRequestException("No authentication session found.");
             }
 
-            String hashedRefreshToken = tokenService.hmacSha256(existingToken);
+            String hashedSessionToken = hashUtil.hmacSha256(existingToken);
 
             // If all devices is true, revoke all tokens for the user (logout from all devices)
             if (logoutRequest.isAllDevices()) {
 
-                // Get user ID from the refresh token
-                UUID userId = redisRefreshTokenService.getUserIdFromToken(hashedRefreshToken);
+                // Get user ID from the session token
+                UUID userId = redisSessionTokenService.getUserIdFromToken(hashedSessionToken);
 
                 // If no user ID found, throw an exception
                 if(userId == null) {
                     throw new BadRequestException("Could not find user for the provided token.");
                 }
 
-                // Revoke all refresh tokens for the user
-                redisRefreshTokenService.revokeAllTokensForUser(userId);
+                // Revoke all session tokens for the user
+                redisSessionTokenService.revokeAllTokensForUser(userId);
             } else {
 
-                // Revoke only the current refresh token
-                redisRefreshTokenService.revokeToken(hashedRefreshToken);
+                // Revoke only the current session token
+                redisSessionTokenService.revokeToken(hashedSessionToken);
             }
 
         } finally {
 
-            // Invalidate the refresh token by setting it to null
+            // Invalidate the session token by setting it to null
             // This will remove the cookie from the client side
             // no matter what happens in the try block.
             //

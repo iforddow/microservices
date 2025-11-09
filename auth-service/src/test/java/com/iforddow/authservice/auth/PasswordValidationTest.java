@@ -1,6 +1,6 @@
 package com.iforddow.authservice.auth;
 
-import com.iforddow.authservice.auth.bo.AuthBO;
+import com.iforddow.authservice.auth.validator.PasswordValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,11 +19,11 @@ public class PasswordValidationTest {
      *
      * */
 
-    private AuthBO authBO;
+    private PasswordValidator passwordValidator;
 
     @BeforeEach
     public void setUp() {
-        authBO = new AuthBO();
+        passwordValidator = new PasswordValidator();
     }
 
     @Test
@@ -32,7 +32,7 @@ public class PasswordValidationTest {
 
         String password = "FranklinTheTurtle1!";
 
-        assert(authBO.validatePassword(password).isEmpty());
+        assert(passwordValidator.validatePassword(password).isEmpty());
 
     }
 
@@ -42,7 +42,7 @@ public class PasswordValidationTest {
 
         String password = "___123Ab!";
 
-        assert(authBO.validatePassword(password).isEmpty());
+        assert(passwordValidator.validatePassword(password).isEmpty());
 
     }
 
@@ -52,7 +52,7 @@ public class PasswordValidationTest {
 
         String password = "thisshittypasswordshouldfail";
 
-        assert(!authBO.validatePassword(password).isEmpty());
+        assert(!passwordValidator.validatePassword(password).isEmpty());
 
     }
 
@@ -62,7 +62,7 @@ public class PasswordValidationTest {
 
         String password = "alongwithonewithnumbers1andspecial!";
 
-        assert(!authBO.validatePassword(password).isEmpty());
+        assert(!passwordValidator.validatePassword(password).isEmpty());
 
     }
 
@@ -74,7 +74,7 @@ public class PasswordValidationTest {
         String newPassword = "FranklinTheTurtle1!";
         String confirmPassword = "FranklinTheTurtle1!";
 
-        assert(authBO.validatePassword(oldPassword, newPassword, confirmPassword).isEmpty());
+        assert(passwordValidator.validatePassword(oldPassword, newPassword, confirmPassword).isEmpty());
 
     }
 
@@ -86,7 +86,7 @@ public class PasswordValidationTest {
         String newPassword = "BobTheBuilder2000*";
         String confirmPassword = "BobTheBuilder2000*";
 
-        assert(authBO.validatePassword(oldPassword, newPassword, confirmPassword).isEmpty());
+        assert(passwordValidator.validatePassword(oldPassword, newPassword, confirmPassword).isEmpty());
 
     }
 
@@ -98,7 +98,7 @@ public class PasswordValidationTest {
         String newPassword = "FranklinTheTurtle1!";
         String confirmPassword = "FranklinTheTurtle1!";
 
-        assert(!authBO.validatePassword(oldPassword, newPassword, confirmPassword).isEmpty());
+        assert(!passwordValidator.validatePassword(oldPassword, newPassword, confirmPassword).isEmpty());
 
     }
 
@@ -110,7 +110,7 @@ public class PasswordValidationTest {
         String newPassword = "BobTheBuilder2000*";
         String confirmPassword = "BobTheBuilder1999*";
 
-        assert(!authBO.validatePassword(oldPassword, newPassword, confirmPassword).isEmpty());
+        assert(!passwordValidator.validatePassword(oldPassword, newPassword, confirmPassword).isEmpty());
 
     }
 
@@ -121,7 +121,7 @@ public class PasswordValidationTest {
         String newPassword = "BobTheBuilder2000*";
         String confirmPassword = "BobTheBuilder2000*";
 
-        assert(authBO.validatePassword(newPassword, confirmPassword).isEmpty());
+        assert(passwordValidator.validatePassword(newPassword, confirmPassword).isEmpty());
 
     }
 
@@ -132,7 +132,7 @@ public class PasswordValidationTest {
         String newPassword = "FranklinTheTurtle1!*";
         String confirmPassword = "FranklinTheTurtle1!*";
 
-        assert(authBO.validatePassword(newPassword, confirmPassword).isEmpty());
+        assert(passwordValidator.validatePassword(newPassword, confirmPassword).isEmpty());
 
     }
 
@@ -143,7 +143,7 @@ public class PasswordValidationTest {
         String newPassword = "FranklinTheTurtle2000!*";
         String confirmPassword = "FranklinTheTurtle2000!";
 
-        assert(!authBO.validatePassword(newPassword, confirmPassword).isEmpty());
+        assert(!passwordValidator.validatePassword(newPassword, confirmPassword).isEmpty());
 
     }
 
@@ -154,7 +154,7 @@ public class PasswordValidationTest {
         String newPassword = "franklinTheTurtle1";
         String confirmPassword = "franklinTheTurtle1";
 
-        assert(!authBO.validatePassword(newPassword, confirmPassword).isEmpty());
+        assert(!passwordValidator.validatePassword(newPassword, confirmPassword).isEmpty());
 
     }
 

@@ -13,6 +13,13 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * A JPA entity representing a user in the authentication system.
+ * Implements Spring Security's UserDetails interface for integration with security features.
+ *
+ * @author IFD
+ * @since 2025-11-09
+ * */
 @Data
 @Builder
 @NoArgsConstructor

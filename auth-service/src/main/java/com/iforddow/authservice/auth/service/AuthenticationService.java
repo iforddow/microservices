@@ -2,8 +2,8 @@ package com.iforddow.authservice.auth.service;
 
 import com.iforddow.authservice.auth.entity.User;
 import com.iforddow.authservice.auth.repository.UserRepository;
+import com.iforddow.authservice.auth.request.SessionTokenRequest;
 import com.iforddow.authservice.auth.request.LoginRequest;
-import com.iforddow.authservice.auth.request.RefreshTokenRequest;
 import com.iforddow.authservice.auth.utility.DeviceType;
 import com.iforddow.authservice.common.exception.BadRequestException;
 import com.iforddow.authservice.common.exception.InvalidCredentialsException;
@@ -11,6 +11,7 @@ import com.iforddow.authservice.common.exception.ResourceNotFoundException;
 import com.iforddow.authservice.common.exception.UnauthorizedException;
 import com.iforddow.authservice.common.security.JwtService;
 import com.iforddow.authservice.common.utility.AuthServiceUtility;
+import com.iforddow.authservice.common.utility.HashUtil;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,9 +38,10 @@ public class AuthenticationService {
 
     private final UserRepository userRepository;
     private final AuthenticationManager authenticationManager;
-    private final TokenService tokenService;
-    private final RedisRefreshTokenService redisRefreshTokenService;
+    private final SessionTokenService sessionTokenService;
+    private final RedisSessionTokenService redisSessionTokenService;
     private final JwtService jwtService;
+    private final HashUtil hashUtil;
 
     @Value("${auth.max.sessions}")
     private int MAX_CONCURRENT_SESSIONS;
@@ -74,38 +76,31 @@ public class AuthenticationService {
             // Set authentication in security context
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            // Revoke existing refresh token if provided
+            // Revoke existing session token if provided
             // This is useful if somehow the user hits the login endpoint
             // while already logged in on the same device
-            if(AuthServiceUtility.isNullOrEmpty(existingToken))  {
+            if(!AuthServiceUtility.isNullOrEmpty(existingToken))  {
 
-                // Hash the existing refresh token
-                String existingTokenHashed = tokenService.hmacSha256(existingToken);
+                // Hash the existing session token
+                String existingTokenHashed = hashUtil.hmacSha256(existingToken);
 
                 // Revoke the existing token
-                redisRefreshTokenService.revokeToken(existingTokenHashed);
+                redisSessionTokenService.revokeToken(existingTokenHashed);
             }
 
             // Get all valid tokens for the user
-            Set<String> validTokens = redisRefreshTokenService.getValidTokensForUser(user.getId());
+            Set<String> validTokens = redisSessionTokenService.getValidTokensForUser(user.getId());
 
             // If user has reached max concurrent sessions, revoke the oldest tokens
             if(validTokens.size() >= MAX_CONCURRENT_SESSIONS) {
                 int tokensToRevoke = validTokens.size() - MAX_CONCURRENT_SESSIONS + 1;
 
-                redisRefreshTokenService.revokeOldestTokens(user.getId(), tokensToRevoke);
+                redisSessionTokenService.revokeOldestTokens(user.getId(), tokensToRevoke);
             }
 
             // Create new tokens based on device type
-            // We do this because web only needs refresh cookie
-            // whereas mobile needs both access and refresh tokens in response body
             try {
-                String token = tokenService.createNewTokens(user, loginRequest.getDeviceType(), response);
-
-//                smsService.sendSms("+19023936781",
-//                        "User " + user.getEmail() + " has logged in on "
-//                                 + loginRequest.getDeviceType().toString() + " device.",
-//                        false);
+                String token = sessionTokenService.createNewTokens(user, loginRequest.getDeviceType(), response);
 
                 if(loginRequest.getDeviceType().equals(DeviceType.WEB)) {
                     return null;
@@ -125,33 +120,35 @@ public class AuthenticationService {
             }
             // Log or return the specific error
             throw new BadRequestException("Authentication failed: " + ex.getMessage());
+        } catch (Exception e) {
+            throw new BadRequestException("Authentication error: " + e.getMessage());
         }
 
     }
 
     /**
-     * A method to handle token refresh requests.
+     * A method to handle session token refresh requests.
      *
-     * @param refreshTokenRequest The refresh token request.
-     * @return ResponseEntity containing the new access token if refresh is successful.
+     * @param sessionTokenRequest The session token request.
+     * @return ResponseEntity containing the new session token if refresh is successful.
      * @author IFD
      * @since 2025-06-15
      */
-    public String refreshToken(RefreshTokenRequest refreshTokenRequest, HttpServletResponse response) {
+    public String refreshSessionToken(SessionTokenRequest sessionTokenRequest, HttpServletResponse response) {
 
-        if(!(refreshTokenRequest.getDeviceType() == DeviceType.WEB) && !refreshTokenRequest.getDeviceType().equals(DeviceType.MOBILE)) {
+        if(!(sessionTokenRequest.getDeviceType() == DeviceType.WEB) && !sessionTokenRequest.getDeviceType().equals(DeviceType.MOBILE)) {
             throw new BadRequestException("Invalid device type");
         }
 
-        String refreshToken = refreshTokenRequest.getRefreshToken();
+        String sessionToken = sessionTokenRequest.getSessionToken();
 
-        if(!jwtService.validateJwtToken(refreshToken)) {
+        if(!jwtService.validateJwtToken(sessionToken)) {
             throw new UnauthorizedException("Invalid token");
         }
 
-        String hashedRefreshToken = tokenService.hmacSha256(refreshToken);
+        String hashedSessionToken = hashUtil.hmacSha256(sessionToken);
 
-        UUID userId = redisRefreshTokenService.getUserIdFromToken(hashedRefreshToken);
+        UUID userId = redisSessionTokenService.getUserIdFromToken(hashedSessionToken);
 
         if(userId == null) {
             throw new BadRequestException("User id not found for the provided token");
@@ -161,13 +158,13 @@ public class AuthenticationService {
                 () -> new ResourceNotFoundException("User not found in database")
         );
 
-        redisRefreshTokenService.revokeToken(hashedRefreshToken);
+        redisSessionTokenService.revokeToken(hashedSessionToken);
 
-        if(refreshTokenRequest.getDeviceType() == DeviceType.WEB) {
-            tokenService.createNewTokens(user, DeviceType.WEB, response);
+        if(sessionTokenRequest.getDeviceType() == DeviceType.WEB) {
+            sessionTokenService.createNewTokens(user, DeviceType.WEB, response);
             return null;
         } else {
-            return tokenService.createNewTokens(user, DeviceType.MOBILE, response);
+            return sessionTokenService.createNewTokens(user, DeviceType.MOBILE, response);
         }
 
     }

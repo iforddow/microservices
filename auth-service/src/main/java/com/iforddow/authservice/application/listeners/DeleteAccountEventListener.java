@@ -1,7 +1,7 @@
 package com.iforddow.authservice.application.listeners;
 
 import com.iforddow.authservice.application.events.DeleteAccountEvent;
-import com.iforddow.authservice.auth.service.RedisRefreshTokenService;
+import com.iforddow.authservice.auth.service.RedisSessionTokenService;
 import com.iforddow.authservice.common.service.RabbitSenderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -15,7 +15,7 @@ import java.util.UUID;
 public class DeleteAccountEventListener {
 
     private final RabbitSenderService rabbitSenderService;
-    private final RedisRefreshTokenService redisRefreshTokenService;
+    private final RedisSessionTokenService redisSessionTokenService;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleDeleteAccountEvent(DeleteAccountEvent event) {
@@ -24,8 +24,8 @@ public class DeleteAccountEventListener {
         // Send message to other services about account deletion
         rabbitSenderService.sendDeletedAccountMessage(userId.toString());
 
-        // Revoke all refresh tokens associated with the user
-        redisRefreshTokenService.revokeAllTokensForUser(userId);
+        // Revoke all session tokens associated with the user
+        redisSessionTokenService.revokeAllTokensForUser(userId);
     }
 
 }

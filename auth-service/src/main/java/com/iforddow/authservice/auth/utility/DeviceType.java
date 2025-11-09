@@ -3,6 +3,14 @@ package com.iforddow.authservice.auth.utility;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Getter;
 
+/**
+ * A DeviceType enum representing different types of devices.
+ * Each enum constant has an associated string value.
+ * Includes a method to create an enum constant from a string value.
+ *
+ * @author IFD
+ * @since 2025-11-09
+ * */
 @Getter
 public enum DeviceType {
     WEB("web"),

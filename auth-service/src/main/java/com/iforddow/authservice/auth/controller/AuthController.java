@@ -2,10 +2,13 @@ package com.iforddow.authservice.auth.controller;
 
 import com.iforddow.authservice.auth.request.*;
 import com.iforddow.authservice.auth.service.*;
+import com.iforddow.authservice.common.service.GeoLocationService;
 import com.iforddow.authservice.common.security.JwtService;
 import com.iforddow.authservice.common.utility.AuthServiceUtility;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,15 +22,17 @@ import org.springframework.web.bind.annotation.*;
  */
 @RequiredArgsConstructor
 @RestController
+@Slf4j
 public class AuthController {
 
     private final RegisterService registerService;
     private final AuthenticationService authenticationService;
     private final DeleteAccountService deleteAccountService;
     private final LogoutService logoutService;
-    private final TokenService tokenService;
+    private final SessionTokenService sessionTokenService;
     private final PasswordService passwordService;
     private final JwtService jwtService;
+    private final GeoLocationService geoLocationService;
 
     /**
      * An endpoint for accessing the registration method.
@@ -40,16 +45,15 @@ public class AuthController {
     public ResponseEntity<?> register(
             @CookieValue(value = "${jwt.cookie.name}", required = false) String cookieValue,
             @RequestHeader(value = "Authorization", required = false) String authHeader,
-            @RequestBody RegisterRequest registerRequest, HttpServletResponse response) {
+            @RequestBody RegisterRequest registerRequest,
+            HttpServletRequest httpRequest) {
 
-        String existingToken = tokenService.ensureOneToken(cookieValue, authHeader);
+        // Ensure there is only one session token from either cookie or header
+        String existingToken = sessionTokenService.ensureOneToken(cookieValue, authHeader);
 
-        try {
-            registerService.register(registerRequest, existingToken, response);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+        registerService.register(registerRequest, existingToken, httpRequest);
+
+        return ResponseEntity.ok().build();
 
     }
 
@@ -67,14 +71,10 @@ public class AuthController {
             @RequestBody LoginRequest loginRequest,
             HttpServletResponse response) {
 
-        String existingToken = tokenService.ensureOneToken(cookieValue, authHeader);
+        String existingToken = sessionTokenService.ensureOneToken(cookieValue, authHeader);
 
-        try {
-            String loginResult = authenticationService.authenticate(loginRequest, existingToken, response);
-            return ResponseEntity.ok(loginResult);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+        String loginResult = authenticationService.authenticate(loginRequest, existingToken, response);
+        return ResponseEntity.ok(loginResult);
 
     }
 
@@ -90,7 +90,7 @@ public class AuthController {
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @RequestBody LogoutRequest logoutRequest, HttpServletResponse response) {
 
-        String existingToken = tokenService.ensureOneToken(cookieValue, authHeader);
+        String existingToken = sessionTokenService.ensureOneToken(cookieValue, authHeader);
 
         try {
             logoutService.logout(logoutRequest, existingToken, response);
@@ -102,37 +102,37 @@ public class AuthController {
     }
 
     /**
-    * A controller endpoint for accessing the token refresh method.
+    * A controller endpoint for accessing the session token refresh method.
     *
     * @author IFD
     * @since 2025-11-02
     * */
-    @PostMapping("/refresh")
-    public ResponseEntity<?> refresh(
+    @PostMapping("/session/refresh")
+    public ResponseEntity<?> sessionRefresh(
             @CookieValue(value = "${jwt.cookie.name}", required = false) String cookieValue,
-            @RequestBody(required = false) RefreshTokenRequest refreshTokenRequest, HttpServletResponse response) {
+            @RequestBody(required = false) SessionTokenRequest sessionTokenRequest, HttpServletResponse response) {
 
-        // Make sure the refresh token request is valid
-        if (refreshTokenRequest == null) {
-            return ResponseEntity.badRequest().body("Refresh token and device type is required");
+        // Make sure the session token request is valid
+        if (sessionTokenRequest == null) {
+            return ResponseEntity.badRequest().body("Session token and device type is required");
         }
 
-        // If there is an existing refresh token cookie, set it in the refresh token request
-        // Only for Web scenarios where mobile apps won't have cookies so the refresh token
+        // If there is an existing session token cookie, set it in the session token request
+        // Only for Web scenarios where mobile apps won't have cookies so the session token
         // is already expected to be in the request body
         if(!AuthServiceUtility.isNullOrEmpty(cookieValue)) {
-            refreshTokenRequest.setRefreshToken(cookieValue);
+            sessionTokenRequest.setSessionToken(cookieValue);
         }
 
-        // Make sure the refresh token is present
-        if(refreshTokenRequest.getRefreshToken() == null) {
-            return ResponseEntity.badRequest().body("Existing refresh token was not found");
+        // Make sure the session token is present
+        if(sessionTokenRequest.getSessionToken() == null) {
+            return ResponseEntity.badRequest().body("Existing session token was not found");
         }
 
         try {
-            String refreshResult = authenticationService.refreshToken(refreshTokenRequest, response);
+            String refreshSessionResult = authenticationService.refreshSessionToken(sessionTokenRequest, response);
 
-            return ResponseEntity.ok(refreshResult);
+            return ResponseEntity.ok(refreshSessionResult);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -184,5 +184,13 @@ public class AuthController {
             return ResponseEntity.badRequest().body("Unable to change password: " + e.getMessage());
         }
 
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String xfHeader = request.getHeader("X-Forwarded-For");
+        if (xfHeader == null || xfHeader.isEmpty()) {
+            return request.getRemoteAddr();
+        }
+        return xfHeader.split(",")[0].trim();
     }
 }
